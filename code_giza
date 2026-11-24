@@ -1,0 +1,1327 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة إرسال رسائل تيليجرام للطلاب | Telegram Bulk Sender</title>
+
+    <!-- Google Font: Cairo -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <!-- FontAwesome Icons CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- SheetJS (xlsx) CDN for Excel/CSV parsing & exporting -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+
+    <!-- Tailwind Custom Config -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        cairo: ['Cairo', 'sans-serif'],
+                    },
+                    colors: {
+                        darkbg: '#070b12',
+                        tgBlue: '#229ED9',
+                        tgCyan: '#38bdf8',
+                        emeraldNeon: '#10b981',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: #070b12;
+            color: #e2e8f0;
+            background-image:
+                radial-gradient(circle at 12% 10%, rgba(34, 158, 217, 0.12) 0%, transparent 42%),
+                radial-gradient(circle at 88% 85%, rgba(16, 185, 129, 0.09) 0%, transparent 45%);
+            min-height: 100vh;
+        }
+
+        /* Glassmorphism Card */
+        .glass-card {
+            background: rgba(15, 23, 36, 0.74);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 10px 36px rgba(0, 0, 0, 0.48);
+        }
+
+        .glass-card-tg {
+            background: rgba(34, 158, 217, 0.07);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(56, 189, 248, 0.28);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.5);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(56, 189, 248, 0.35);
+            border-radius: 999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(56, 189, 248, 0.65);
+        }
+
+        /* Custom Toggle Switch */
+        .toggle-checkbox:checked {
+            right: auto;
+            left: 2px;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #229ED9;
+        }
+    </style>
+</head>
+<body class="antialiased selection:bg-sky-500/30 selection:text-sky-200 pb-12">
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed bottom-5 left-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-3 sm:px-0"></div>
+
+    <!-- Top Header -->
+    <header class="sticky top-0 z-30 glass-card border-b border-white/10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-3">
+            <!-- Brand -->
+            <div class="flex items-center gap-3">
+                <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-sky-400 via-tgBlue to-emerald-500 flex items-center justify-center shadow-lg shadow-sky-500/25 text-white text-xl">
+                    <i class="fa-brands fa-telegram"></i>
+                </div>
+                <div>
+                    <h1 class="text-base sm:text-xl font-extrabold text-white tracking-tight flex flex-wrap items-center gap-2">
+                        لوحة إرسال رسائل تيليجرام للطلاب
+                        <span id="file-badge" class="hidden text-xs font-semibold px-2.5 py-0.5 rounded-full bg-sky-500/15 text-sky-300 border border-sky-500/30"></span>
+                    </h1>
+                    <p class="text-xs text-slate-400">إرسال سريع بالتتابع من شيت الإكسيل بالاسم واللينك</p>
+                </div>
+            </div>
+
+            <!-- Header Actions -->
+            <div class="flex flex-wrap items-center gap-2">
+                <button id="btn-export-excel" class="hidden px-3 py-2 rounded-xl text-xs sm:text-sm font-bold bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-file-excel"></i>
+                    <span>تصدير التقرير</span>
+                </button>
+                <button id="btn-open-mapping" class="hidden px-3 py-2 rounded-xl text-xs sm:text-sm font-bold bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 border border-white/10 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-sliders"></i>
+                    <span>الأعمدة</span>
+                </button>
+                <button id="btn-reset-data" class="hidden px-3 py-2 rounded-xl text-xs sm:text-sm font-bold bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-rotate-right"></i>
+                    <span>تصفير / ملف جديد</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 mt-6">
+
+        <!-- ========================================== -->
+        <!-- SECTION 1: UPLOAD VIEW (Shown when no data) -->
+        <!-- ========================================== -->
+        <section id="upload-section" class="max-w-2xl mx-auto mt-8 sm:mt-12">
+            <div class="glass-card rounded-3xl p-6 sm:p-10 text-center relative overflow-hidden">
+                <div class="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-sky-400 via-tgBlue to-emerald-400"></div>
+
+                <div class="w-20 h-20 mx-auto rounded-2xl bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-4xl text-sky-400 mb-5 shadow-inner">
+                    <i class="fa-brands fa-telegram"></i>
+                </div>
+                <h2 class="text-2xl sm:text-3xl font-black text-white mb-2">ارفع شيت الطلاب وابدأ الإرسال على تيليجرام</h2>
+                <p class="text-sm text-slate-400 mb-6 leading-relaxed">
+                    يدعم ملفات <span class="text-sky-400 font-bold">.xlsx</span> و <span class="text-sky-400 font-bold">.xls</span> و <span class="text-sky-400 font-bold">.csv</span> — بيتعرف على الاسم ورقم التليفون ويظبط أرقام مصر (<span class="font-mono text-emerald-400" dir="ltr">+20</span>) أوتوماتيك.
+                </p>
+
+                <!-- Dropzone -->
+                <div id="dropzone" class="relative border-2 border-dashed border-sky-500/40 hover:border-sky-400 bg-slate-900/50 hover:bg-sky-500/5 rounded-2xl p-8 sm:p-12 transition cursor-pointer group">
+                    <input type="file" id="excel-file-input" accept=".xlsx,.xls,.csv" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                    <div class="pointer-events-none flex flex-col items-center gap-3">
+                        <div class="w-14 h-14 rounded-2xl bg-sky-500/15 text-sky-400 flex items-center justify-center text-2xl group-hover:scale-110 transition">
+                            <i class="fa-solid fa-cloud-arrow-up"></i>
+                        </div>
+                        <p class="text-base font-bold text-white">اسحب ملف الإكسيل هنا أو اضغط للاختيار</p>
+                        <p class="text-xs text-slate-400">مثال: اسيوط.xlsx — كل البيانات بتتعالج محلياً على جهازك فقط</p>
+                    </div>
+                </div>
+
+                <!-- Sample Data Option -->
+                <div class="mt-6 pt-6 border-t border-white/10 flex flex-col sm:flex-row items-center justify-center gap-3">
+                    <span class="text-xs text-slate-400">عاوز تجرب اللوحة الأول قبل ما ترفع ملفك؟</span>
+                    <button id="btn-load-sample" class="px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-800/90 hover:bg-slate-700 text-sky-300 border border-sky-500/30 transition flex items-center gap-2">
+                        <i class="fa-solid fa-flask"></i>
+                        <span>تحميل بيانات تجريبية (5 طلاب)</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- SECTION 2: MAIN DASHBOARD (Shown with data) -->
+        <!-- ========================================== -->
+        <section id="dashboard-section" class="hidden space-y-6">
+
+            <!-- Top Stats & Progress Bar -->
+            <div class="space-y-3">
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                    <!-- Total -->
+                    <div class="glass-card rounded-2xl p-4 flex items-center justify-between">
+                        <div>
+                            <p class="text-xs text-slate-400 font-semibold">إجمالي الطلاب</p>
+                            <p id="stat-total" class="text-2xl sm:text-3xl font-black text-white mt-1">0</p>
+                        </div>
+                        <div class="w-11 h-11 rounded-xl bg-slate-800/90 border border-white/10 flex items-center justify-center text-lg text-slate-300">
+                            <i class="fa-solid fa-users"></i>
+                        </div>
+                    </div>
+
+                    <!-- Sent -->
+                    <div class="glass-card rounded-2xl p-4 flex items-center justify-between border-emerald-500/20">
+                        <div>
+                            <p class="text-xs text-emerald-400 font-semibold">تم الإرسال</p>
+                            <p id="stat-sent" class="text-2xl sm:text-3xl font-black text-emerald-400 mt-1">0</p>
+                        </div>
+                        <div class="w-11 h-11 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-lg text-emerald-400">
+                            <i class="fa-solid fa-paper-plane"></i>
+                        </div>
+                    </div>
+
+                    <!-- Skipped -->
+                    <div class="glass-card rounded-2xl p-4 flex items-center justify-between border-amber-500/20">
+                        <div>
+                            <p class="text-xs text-amber-400 font-semibold">تم التخطي / خصوصية</p>
+                            <p id="stat-skipped" class="text-2xl sm:text-3xl font-black text-amber-300 mt-1">0</p>
+                        </div>
+                        <div class="w-11 h-11 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-lg text-amber-400">
+                            <i class="fa-solid fa-triangle-exclamation"></i>
+                        </div>
+                    </div>
+
+                    <!-- Remaining -->
+                    <div class="glass-card rounded-2xl p-4 flex items-center justify-between border-sky-500/20">
+                        <div>
+                            <p class="text-xs text-sky-400 font-semibold">المتبقي</p>
+                            <p id="stat-remaining" class="text-2xl sm:text-3xl font-black text-sky-300 mt-1">0</p>
+                        </div>
+                        <div class="w-11 h-11 rounded-xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-lg text-sky-400">
+                            <i class="fa-solid fa-hourglass-half"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Animated Full-Width Progress Bar -->
+                <div class="glass-card rounded-2xl px-4 py-3 flex items-center gap-4">
+                    <span class="text-xs font-bold text-slate-300 whitespace-nowrap">نسبة الإنجاز:</span>
+                    <div class="flex-1 h-3 bg-slate-800/90 rounded-full overflow-hidden border border-white/5">
+                        <div id="stat-progress-bar" class="h-full bg-gradient-to-l from-emerald-400 via-sky-400 to-tgBlue rounded-full transition-all duration-500" style="width: 0%"></div>
+                    </div>
+                    <span id="stat-percent" class="text-sm font-black text-sky-300 min-w-[44px] text-left">0%</span>
+                </div>
+            </div>
+
+            <!-- Main 2-Column Workspace -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+                <!-- RIGHT COLUMN (Focus Card + Telegram Mode + Template Editor) -->
+                <div class="lg:col-span-7 xl:col-span-8 space-y-6">
+
+                    <!-- Sequential "Fast-Send" Focus Card -->
+                    <div class="glass-card rounded-3xl p-5 sm:p-7 relative overflow-hidden">
+                        <div class="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-sky-400 via-tgBlue to-emerald-400"></div>
+
+                        <!-- Card Header: Position & Status -->
+                        <div class="flex flex-wrap items-center justify-between gap-2 mb-5">
+                            <span id="focus-position" class="px-3.5 py-1 rounded-full text-xs sm:text-sm font-extrabold bg-sky-500/15 text-sky-300 border border-sky-500/30">
+                                طالب 1 من 0
+                            </span>
+                            <div class="flex items-center gap-2">
+                                <span id="focus-status-badge" class="px-3 py-1 rounded-full text-xs font-bold bg-slate-800 text-slate-300 border border-white/10">
+                                    لم يُرسل
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Student Info Card -->
+                        <div class="bg-slate-900/65 border border-white/10 rounded-2xl p-4 sm:p-5 mb-5">
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div>
+                                    <h2 id="focus-name" class="text-xl sm:text-2xl font-black text-white leading-snug">---</h2>
+                                    <div class="flex flex-wrap items-center gap-2.5 mt-2">
+                                        <span class="inline-flex items-center gap-1.5 font-mono text-sm sm:text-base font-bold text-sky-300 bg-sky-500/10 px-3 py-1 rounded-lg border border-sky-500/20" dir="ltr" id="focus-phone">---</span>
+                                        <button id="btn-copy-phone" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-white/10 transition flex items-center gap-1.5" title="نسخ رقم الهاتف">
+                                            <i class="fa-solid fa-phone text-sky-400"></i>
+                                            <span>نسخ الرقم</span>
+                                        </button>
+                                        <span id="focus-phone-warning" class="hidden text-xs font-bold px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                                            <i class="fa-solid fa-circle-exclamation"></i> رقم غير صالح
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Metadata Badges (Code, Grade, Governorate, Area) -->
+                            <div id="focus-meta-pills" class="flex flex-wrap gap-2 mt-4 pt-3 border-t border-white/5 text-xs"></div>
+                        </div>
+
+                        <!-- Live Message Preview -->
+                        <div class="mb-5">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-bold text-slate-400 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-eye text-sky-400"></i>
+                                    <span>معاينة الرسالة الجاهزة للطالب ده:</span>
+                                </span>
+                                <button id="btn-copy-msg" class="text-xs font-bold text-sky-400 hover:text-sky-300 transition flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-500/10 border border-sky-500/20">
+                                    <i class="fa-regular fa-copy"></i>
+                                    <span>نسخ الرسالة</span>
+                                </button>
+                            </div>
+                            <div id="focus-message-preview" class="glass-card-tg rounded-2xl p-4 text-sm sm:text-base text-slate-100 whitespace-pre-wrap leading-relaxed select-all"></div>
+                        </div>
+
+                        <!-- Telegram Opening Mode Selector -->
+                        <div class="mb-5 p-3.5 rounded-2xl bg-slate-900/70 border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div class="flex items-center gap-2 text-xs font-bold text-slate-300">
+                                <i class="fa-solid fa-bolt text-sky-400"></i>
+                                <span>طريقة فتح تيليجرام:</span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-1.5 bg-slate-950/70 p-1 rounded-xl border border-white/5">
+                                <button type="button" data-mode="web" class="tg-mode-btn px-3 py-1.5 rounded-lg text-xs font-bold transition">
+                                    🌐 رابط المتصفح (t.me)
+                                </button>
+                                <button type="button" data-mode="app" class="tg-mode-btn px-3 py-1.5 rounded-lg text-xs font-bold transition">
+                                    ⚡ التطبيق مباشرة (tg://)
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- PRIMARY ACTION BUTTONS -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                            <button id="btn-send-tg" class="w-full py-4 px-5 rounded-2xl bg-gradient-to-r from-sky-400 to-tgBlue hover:from-sky-300 hover:to-sky-500 text-slate-950 font-black text-sm sm:text-base shadow-lg shadow-sky-500/25 transition active:scale-[0.98] flex items-center justify-center gap-2">
+                                <i class="fa-brands fa-telegram text-lg"></i>
+                                <span>فتح شات تيليجرام بالرسالة</span>
+                            </button>
+
+                            <button id="btn-next-and-open" class="w-full py-4 px-5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-sm sm:text-base shadow-lg shadow-emerald-500/25 transition active:scale-[0.98] flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-forward-step text-lg"></i>
+                                <span>التالي وفتح الشات مباشرة</span>
+                            </button>
+                        </div>
+
+                        <!-- Secondary Navigation & Skip Buttons -->
+                        <div class="flex flex-wrap items-center justify-between gap-2 pt-4 border-t border-white/10">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <button id="btn-prev" class="px-3.5 py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-xs sm:text-sm font-bold border border-white/10 transition flex items-center gap-1.5">
+                                    <i class="fa-solid fa-arrow-right"></i>
+                                    <span>السابق</span>
+                                </button>
+                                <button id="btn-next-only" class="px-3.5 py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-xs sm:text-sm font-bold border border-white/10 transition flex items-center gap-1.5">
+                                    <span>التالي فقط</span>
+                                    <i class="fa-solid fa-arrow-left"></i>
+                                </button>
+                            </div>
+
+                            <button id="btn-skip" class="px-4 py-2.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 text-xs sm:text-sm font-bold border border-amber-500/30 transition flex items-center gap-1.5">
+                                <i class="fa-solid fa-user-slash"></i>
+                                <span>تخطي / معندوش تيليجرام</span>
+                            </button>
+                        </div>
+
+                        <!-- Skip Sent Toggle + Keyboard Shortcuts Hint -->
+                        <div class="mt-4 pt-3 border-t border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div class="flex items-center gap-3">
+                                <div class="relative inline-block w-11 h-6 align-middle select-none shrink-0">
+                                    <input type="checkbox" id="toggle-skip-sent" checked class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-2 border-slate-700 appearance-none cursor-pointer top-0.5 right-0.5 transition-all duration-200 z-10"/>
+                                    <label for="toggle-skip-sent" class="toggle-label block overflow-hidden h-6 rounded-full bg-slate-700 cursor-pointer transition-colors duration-200"></label>
+                                </div>
+                                <label for="toggle-skip-sent" class="text-xs text-slate-300 font-semibold cursor-pointer select-none">
+                                    تجاهل من تم الإرسال لهم عند الضغط على "التالي"
+                                </label>
+                            </div>
+
+                            <!-- Subtle Keyboard Shortcuts Hint -->
+                            <div class="hidden sm:flex items-center gap-2 text-[11px] text-slate-400">
+                                <span class="px-1.5 py-0.5 rounded bg-slate-800 border border-white/10 font-mono text-sky-300">Enter / N</span>
+                                <span>التالي+فتح</span>
+                                <span class="text-slate-600">|</span>
+                                <span class="px-1.5 py-0.5 rounded bg-slate-800 border border-white/10 font-mono text-amber-300">S</span>
+                                <span>تخطي</span>
+                                <span class="text-slate-600">|</span>
+                                <span class="px-1.5 py-0.5 rounded bg-slate-800 border border-white/10 font-mono text-slate-300">← →</span>
+                                <span>تنقل</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Message Template & Link Editor -->
+                    <div class="glass-card rounded-3xl p-5 sm:p-6 space-y-4">
+                        <div class="flex flex-wrap items-center justify-between gap-3">
+                            <h3 class="text-base font-extrabold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-pen-to-square text-sky-400"></i>
+                                <span>تخصيص الرسالة واللينك</span>
+                            </h3>
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                <button type="button" data-insert="{الاسم}" class="insert-var-btn px-2.5 py-1 rounded-lg bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 text-xs font-bold border border-sky-500/30 transition">
+                                    + {الاسم}
+                                </button>
+                                <button type="button" data-insert="{الاسم_الاول}" class="insert-var-btn px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 text-xs font-bold border border-emerald-500/30 transition">
+                                    + {الاسم_الاول}
+                                </button>
+                                <button type="button" data-insert="{اللينك}" class="insert-var-btn px-2.5 py-1 rounded-lg bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 text-xs font-bold border border-purple-500/30 transition">
+                                    + {اللينك}
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Dedicated Telegram Link Input -->
+                        <div>
+                            <label for="telegram-link-input" class="block text-xs font-bold text-slate-400 mb-1.5">
+                                لينك جروب أو قناة التليجرام ({اللينك}):
+                            </label>
+                            <div class="relative">
+                                <input type="url" id="telegram-link-input" dir="ltr" class="w-full rounded-xl bg-slate-900/80 border border-white/10 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none py-2.5 pl-4 pr-10 text-sm text-sky-300 font-mono" placeholder="https://t.me/...">
+                                <i class="fa-solid fa-link absolute right-3.5 top-3 text-slate-500 text-sm"></i>
+                            </div>
+                        </div>
+
+                        <!-- Message Template Textarea -->
+                        <div>
+                            <label for="message-template" class="block text-xs font-bold text-slate-400 mb-1.5">
+                                نص الرسالة:
+                            </label>
+                            <textarea id="message-template" rows="4" class="w-full rounded-2xl bg-slate-900/80 border border-white/10 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none p-4 text-sm text-white leading-relaxed resize-y"></textarea>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- LEFT COLUMN (Searchable & Filterable Student List) -->
+                <div class="lg:col-span-5 xl:col-span-4 glass-card rounded-3xl p-4 sm:p-5 flex flex-col max-h-[820px]">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-base font-extrabold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-list-check text-sky-400"></i>
+                            <span>قائمة الطلاب</span>
+                        </h3>
+                        <span id="list-count-badge" class="text-xs font-bold text-slate-400">0 طالب</span>
+                    </div>
+
+                    <!-- Search Input -->
+                    <div class="relative mb-3">
+                        <input type="text" id="search-input" placeholder="ابحث بالاسم، الرقم، أو الكود..." class="w-full rounded-xl bg-slate-900/80 border border-white/10 focus:border-sky-500 outline-none py-2.5 pr-9 pl-3 text-xs sm:text-sm text-white placeholder-slate-500">
+                        <i class="fa-solid fa-magnifying-glass absolute right-3 top-3 text-slate-500 text-xs"></i>
+                    </div>
+
+                    <!-- Filter Tabs -->
+                    <div class="grid grid-cols-4 gap-1 mb-3 bg-slate-900/75 p-1 rounded-xl border border-white/5">
+                        <button data-filter="all" class="filter-tab py-1.5 rounded-lg text-[11px] font-bold transition bg-sky-500 text-slate-950">الكل</button>
+                        <button data-filter="pending" class="filter-tab py-1.5 rounded-lg text-[11px] font-bold transition text-slate-400 hover:text-white">المتبقي</button>
+                        <button data-filter="sent" class="filter-tab py-1.5 rounded-lg text-[11px] font-bold transition text-slate-400 hover:text-white">تم الإرسال</button>
+                        <button data-filter="skipped" class="filter-tab py-1.5 rounded-lg text-[11px] font-bold transition text-slate-400 hover:text-white">المتخطى</button>
+                    </div>
+
+                    <!-- Scrollable Student List -->
+                    <div id="student-list-container" class="flex-1 overflow-y-auto space-y-2 pr-1"></div>
+                </div>
+
+            </div>
+        </section>
+    </main>
+
+    <!-- ========================================== -->
+    <!-- MODAL: COLUMN MAPPING -->
+    <!-- ========================================== -->
+    <div id="mapping-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+        <div class="glass-card rounded-3xl max-w-lg w-full p-6 border border-sky-500/30">
+            <h3 class="text-lg font-extrabold text-white mb-1 flex items-center gap-2">
+                <i class="fa-solid fa-sliders text-sky-400"></i>
+                <span>ضبط أعمدة ملف الإكسيل</span>
+            </h3>
+            <p class="text-xs text-slate-400 mb-5">تقدر تغيّر عمود الرقم (مثلاً لـ هاتف ولي الأمر) أو أي عمود تاني في أي وقت.</p>
+
+            <div class="space-y-3 text-sm">
+                <div>
+                    <label class="block text-xs font-bold text-sky-400 mb-1">عمود الاسم (مطلوب) *</label>
+                    <select id="map-name" class="w-full rounded-xl bg-slate-900 border border-white/10 p-2.5 text-white outline-none focus:border-sky-500"></select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-sky-400 mb-1">عمود رقم الهاتف (مطلوب) *</label>
+                    <select id="map-phone" class="w-full rounded-xl bg-slate-900 border border-white/10 p-2.5 text-white outline-none focus:border-sky-500"></select>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-1">كود الطالب (اختياري)</label>
+                        <select id="map-code" class="w-full rounded-xl bg-slate-900 border border-white/10 p-2 text-white outline-none"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-1">الصف (اختياري)</label>
+                        <select id="map-grade" class="w-full rounded-xl bg-slate-900 border border-white/10 p-2 text-white outline-none"></select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-1">المحافظة (اختياري)</label>
+                        <select id="map-gov" class="w-full rounded-xl bg-slate-900 border border-white/10 p-2 text-white outline-none"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-1">المنطقة (اختياري)</label>
+                        <select id="map-area" class="w-full rounded-xl bg-slate-900 border border-white/10 p-2 text-white outline-none"></select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 flex items-center justify-end gap-2">
+                <button id="btn-cancel-mapping" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition">إلغاء</button>
+                <button id="btn-save-mapping" class="px-5 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs font-black transition">حفظ وتطبيق</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- MODAL: RESET CONFIRMATION -->
+    <!-- ========================================== -->
+    <div id="reset-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+        <div class="glass-card rounded-3xl max-w-md w-full p-6 border border-rose-500/30 text-center">
+            <div class="w-14 h-14 mx-auto rounded-2xl bg-rose-500/15 text-rose-400 flex items-center justify-center text-2xl mb-4">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <h3 class="text-lg font-extrabold text-white mb-2">تصفير البيانات ورفع ملف جديد؟</h3>
+            <p class="text-xs text-slate-400 mb-6 leading-relaxed">هيتم مسح قائمة الطلاب الحالية وتقدم الإرسال المحفوظ عشان تبدأ بملف إكسيل جديد. (تقدر تصدّر التقرير الأول لو محتاج تحفظه).</p>
+            <div class="flex items-center justify-center gap-3">
+                <button id="btn-cancel-reset" class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition">تراجع</button>
+                <button id="btn-confirm-reset" class="px-5 py-2.5 rounded-xl bg-rose-500 hover:bg-rose-400 text-white text-xs font-black transition">أيوة، صفّر الكل</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- JAVASCRIPT APPLICATION LOGIC -->
+    <!-- ========================================== -->
+    <script>
+        (function () {
+            'use strict';
+
+            // --- Constants & Default State ---
+            const STORAGE_KEY = 'tg_student_sender_v2';
+            const DEFAULT_LINK = 'https://t.me/+Sc4Rj4HrAQdiNjA0';
+            const DEFAULT_TEMPLATE = `أهلاً يا {الاسم} 👋\nده لينك جروب التليجرام الخاص بينا، اضغط هنا للانضمام:\n{اللينك}`;
+
+            let state = {
+                fileName: '',
+                rawRows: [],
+                headers: [],
+                mapping: { name: '', phone: '', code: '', grade: '', gov: '', area: '' },
+                students: [], // { id, name, rawPhone, phone (digits 201...), validPhone, code, grade, gov, area, status: 'pending'|'sent'|'skipped' }
+                currentIndex: 0,
+                template: DEFAULT_TEMPLATE,
+                tgLink: DEFAULT_LINK,
+                tgMode: 'web', // 'web' -> https://t.me/+20...?text=... | 'app' -> tg://resolve?phone=20...&text=...
+                skipSent: true,
+                filter: 'all',
+                searchQuery: ''
+            };
+
+            // --- DOM Elements ---
+            const el = {
+                uploadSection: document.getElementById('upload-section'),
+                dashboardSection: document.getElementById('dashboard-section'),
+                dropzone: document.getElementById('dropzone'),
+                fileInput: document.getElementById('excel-file-input'),
+                btnLoadSample: document.getElementById('btn-load-sample'),
+                fileBadge: document.getElementById('file-badge'),
+                btnExportExcel: document.getElementById('btn-export-excel'),
+                btnOpenMapping: document.getElementById('btn-open-mapping'),
+                btnResetData: document.getElementById('btn-reset-data'),
+
+                statTotal: document.getElementById('stat-total'),
+                statSent: document.getElementById('stat-sent'),
+                statSkipped: document.getElementById('stat-skipped'),
+                statRemaining: document.getElementById('stat-remaining'),
+                statPercent: document.getElementById('stat-percent'),
+                statProgressBar: document.getElementById('stat-progress-bar'),
+
+                focusPosition: document.getElementById('focus-position'),
+                focusStatusBadge: document.getElementById('focus-status-badge'),
+                focusName: document.getElementById('focus-name'),
+                focusPhone: document.getElementById('focus-phone'),
+                btnCopyPhone: document.getElementById('btn-copy-phone'),
+                focusPhoneWarning: document.getElementById('focus-phone-warning'),
+                focusMetaPills: document.getElementById('focus-meta-pills'),
+                focusMessagePreview: document.getElementById('focus-message-preview'),
+
+                tgModeBtns: document.querySelectorAll('.tg-mode-btn'),
+                btnSendTg: document.getElementById('btn-send-tg'),
+                btnNextAndOpen: document.getElementById('btn-next-and-open'),
+                btnPrev: document.getElementById('btn-prev'),
+                btnNextOnly: document.getElementById('btn-next-only'),
+                btnSkip: document.getElementById('btn-skip'),
+                btnCopyMsg: document.getElementById('btn-copy-msg'),
+                toggleSkipSent: document.getElementById('toggle-skip-sent'),
+
+                tgLinkInput: document.getElementById('telegram-link-input'),
+                messageTemplate: document.getElementById('message-template'),
+                insertVarBtns: document.querySelectorAll('.insert-var-btn'),
+
+                searchInput: document.getElementById('search-input'),
+                filterTabs: document.querySelectorAll('.filter-tab'),
+                studentListContainer: document.getElementById('student-list-container'),
+                listCountBadge: document.getElementById('list-count-badge'),
+
+                mappingModal: document.getElementById('mapping-modal'),
+                mapName: document.getElementById('map-name'),
+                mapPhone: document.getElementById('map-phone'),
+                mapCode: document.getElementById('map-code'),
+                mapGrade: document.getElementById('map-grade'),
+                mapGov: document.getElementById('map-gov'),
+                mapArea: document.getElementById('map-area'),
+                btnCancelMapping: document.getElementById('btn-cancel-mapping'),
+                btnSaveMapping: document.getElementById('btn-save-mapping'),
+
+                resetModal: document.getElementById('reset-modal'),
+                btnCancelReset: document.getElementById('btn-cancel-reset'),
+                btnConfirmReset: document.getElementById('btn-confirm-reset'),
+
+                toastContainer: document.getElementById('toast-container')
+            };
+
+            // --- Utility: Toast Notification ---
+            function showToast(message, type = 'success') {
+                const styles = {
+                    success: 'bg-emerald-500/20 border-emerald-500/40 text-emerald-200',
+                    error: 'bg-rose-500/20 border-rose-500/40 text-rose-200',
+                    info: 'bg-sky-500/20 border-sky-500/40 text-sky-200',
+                    warning: 'bg-amber-500/20 border-amber-500/40 text-amber-200'
+                };
+                const toast = document.createElement('div');
+                toast.className = `pointer-events-auto glass-card px-4 py-3 rounded-2xl border text-xs sm:text-sm font-bold shadow-xl transition-all duration-300 translate-y-4 opacity-0 ${styles[type] || styles.info}`;
+                toast.textContent = message;
+                el.toastContainer.appendChild(toast);
+
+                requestAnimationFrame(() => {
+                    toast.classList.remove('translate-y-4', 'opacity-0');
+                });
+
+                setTimeout(() => {
+                    toast.classList.add('translate-y-4', 'opacity-0');
+                    setTimeout(() => toast.remove(), 300);
+                }, 2800);
+            }
+
+            // --- Utility: Copy to Clipboard (iframe-safe) ---
+            function copyText(text, successMsg) {
+                if (!text) return;
+                const temp = document.createElement('textarea');
+                temp.value = text;
+                temp.style.position = 'fixed';
+                temp.style.opacity = '0';
+                document.body.appendChild(temp);
+                temp.select();
+                try {
+                    document.execCommand('copy');
+                    showToast(successMsg || 'تم النسخ بنجاح!', 'success');
+                } catch (err) {
+                    showToast('تعذّر النسخ', 'error');
+                }
+                document.body.removeChild(temp);
+            }
+
+            // --- Utility: Smart Egyptian Phone Number Formatter ---
+            function formatEgyptPhone(raw) {
+                if (raw === null || raw === undefined) return { phone: '', valid: false };
+                // Convert Arabic-Indic digits (٠-٩) to Western digits (0-9)
+                let str = String(raw).replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
+                // Strip spaces, dashes, pluses, and non-digit characters
+                let digits = str.replace(/\D/g, '');
+
+                if (!digits) return { phone: '', valid: false };
+
+                // Remove leading 00 if international format 0020...
+                if (digits.startsWith('0020')) {
+                    digits = digits.slice(2);
+                }
+                // 10 digits starting with 1 (Excel dropped leading zero: 1108018996 -> 201108018996)
+                if (digits.length === 10 && digits.startsWith('1')) {
+                    digits = '20' + digits;
+                }
+                // 11 digits starting with 01 (01108018996 -> 201108018996)
+                else if (digits.length === 11 && digits.startsWith('01')) {
+                    digits = '20' + digits.slice(1);
+                }
+                // 13 digits starting with 2001 (2001108018996 -> 201108018996)
+                else if (digits.length === 13 && digits.startsWith('2001')) {
+                    digits = '20' + digits.slice(3);
+                }
+
+                // Validate Egyptian mobile: 2010 / 2011 / 2012 / 2015 + 8 digits (12 digits total)
+                const isValid = /^201[0125]\d{8}$/.test(digits);
+                return { phone: digits, valid: isValid };
+            }
+
+            // --- Utility: Personalize Message ---
+            function buildMessage(student) {
+                if (!student) return '';
+                const fullName = (student.name || '').trim() || 'بطل';
+                const firstName = fullName.split(/\s+/)[0] || fullName;
+                const link = (state.tgLink || '').trim();
+
+                return state.template
+                    .replace(/\{الاسم\}/g, fullName)
+                    .replace(/\{الاسم_الاول\}/g, firstName)
+                    .replace(/\{اللينك\}/g, link)
+                    .replace(/\{الكود\}/g, student.code || '');
+            }
+
+            // --- Utility: Build Telegram URL based on selected mode ---
+            function buildTelegramUrl(phoneDigits, message) {
+                const encodedText = encodeURIComponent(message);
+                if (state.tgMode === 'app') {
+                    // Direct desktop/mobile app link without '+'
+                    return `tg://resolve?phone=${phoneDigits}&text=${encodedText}`;
+                }
+                // Universal web link with '+'
+                return `https://t.me/+${phoneDigits}?text=${encodedText}`;
+            }
+
+            // --- Persistence: Save & Load from localStorage ---
+            function saveState() {
+                try {
+                    const payload = {
+                        fileName: state.fileName,
+                        headers: state.headers,
+                        mapping: state.mapping,
+                        students: state.students,
+                        currentIndex: state.currentIndex,
+                        template: state.template,
+                        tgLink: state.tgLink,
+                        tgMode: state.tgMode,
+                        skipSent: state.skipSent
+                    };
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+                } catch (err) {
+                    console.warn('Could not save state:', err);
+                }
+            }
+
+            function loadState() {
+                try {
+                    const saved = localStorage.getItem(STORAGE_KEY);
+                    if (!saved) return false;
+                    const parsed = JSON.parse(saved);
+                    if (parsed && Array.isArray(parsed.students) && parsed.students.length > 0) {
+                        state = { ...state, ...parsed };
+                        return true;
+                    }
+                } catch (err) {
+                    console.warn('Could not load state:', err);
+                }
+                return false;
+            }
+
+            // --- Column Auto-Detection ---
+            function autoDetectMapping(headers) {
+                const findMatch = (keywords) => {
+                    for (const kw of keywords) {
+                        const exact = headers.find(h => h.trim() === kw);
+                        if (exact) return exact;
+                    }
+                    for (const kw of keywords) {
+                        const partial = headers.find(h => h.trim().includes(kw));
+                        if (partial) return partial;
+                    }
+                    return '';
+                };
+
+                return {
+                    name: findMatch(['الاسم', 'اسم الطالب', 'الاسم بالكامل', 'الأسم', 'name', 'Name']),
+                    phone: findMatch(['الهاتف', 'رقم الهاتف', 'الموبايل', 'رقم التليفون', 'التليفون', 'الرقم', 'تيليجرام', 'phone', 'Phone']),
+                    code: findMatch(['كود الطالب', 'الكود', 'code', 'ID']),
+                    grade: findMatch(['الصف', 'السنة', 'الفرقة', 'grade']),
+                    gov: findMatch(['المحافظة', 'محافظة', 'governorate']),
+                    area: findMatch(['المنطقة', 'المركز', 'البلد', 'العنوان', 'area'])
+                };
+            }
+
+            // --- Build Students Array ---
+            function buildStudentsFromRows(rows, mapping) {
+                return rows
+                    .map((row, idx) => {
+                        const name = String(row[mapping.name] ?? '').trim();
+                        const rawPhone = row[mapping.phone] ?? '';
+                        const formatted = formatEgyptPhone(rawPhone);
+
+                        return {
+                            id: idx + 1,
+                            name: name || `طالب #${idx + 1}`,
+                            rawPhone: String(rawPhone).trim(),
+                            phone: formatted.phone,
+                            validPhone: formatted.valid,
+                            code: mapping.code ? String(row[mapping.code] ?? '').trim() : '',
+                            grade: mapping.grade ? String(row[mapping.grade] ?? '').trim() : '',
+                            gov: mapping.gov ? String(row[mapping.gov] ?? '').trim() : '',
+                            area: mapping.area ? String(row[mapping.area] ?? '').trim() : '',
+                            status: 'pending'
+                        };
+                    })
+                    .filter(s => s.name || s.rawPhone);
+            }
+
+            // --- Handle Excel File Upload ---
+            function handleFile(file) {
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const firstSheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[firstSheetName];
+                        const jsonRows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+                        if (!jsonRows || jsonRows.length === 0) {
+                            showToast('الملف فاضي أو مفيهوش بيانات!', 'error');
+                            return;
+                        }
+
+                        const headers = Object.keys(jsonRows[0]);
+                        const detected = autoDetectMapping(headers);
+
+                        state.fileName = file.name;
+                        state.rawRows = jsonRows;
+                        state.headers = headers;
+                        state.mapping = detected;
+                        state.currentIndex = 0;
+
+                        if (!detected.name || !detected.phone) {
+                            openMappingModal();
+                            showToast('اختار عمود الاسم ورقم الهاتف عشان نبدأ', 'info');
+                        } else {
+                            state.students = buildStudentsFromRows(jsonRows, detected);
+                            saveState();
+                            renderAll();
+                            showToast(`تم تحميل ${state.students.length} طالب بنجاح!`, 'success');
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        showToast('حصل خطأ أثناء قراءة الملف، تأكد إنه ملف إكسيل أو CSV سليم', 'error');
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            }
+
+            // --- Export Report to Excel ---
+            function exportReport() {
+                if (!state.students.length) return;
+                const statusArabic = {
+                    sent: 'تم الإرسال',
+                    skipped: 'متخطى / خصوصية',
+                    pending: 'لم يُرسل'
+                };
+
+                const exportData = state.students.map((s, i) => ({
+                    '#': i + 1,
+                    'الاسم': s.name,
+                    'رقم الهاتف': s.phone ? `+${s.phone}` : s.rawPhone,
+                    'كود الطالب': s.code,
+                    'الصف': s.grade,
+                    'المحافظة': s.gov,
+                    'المنطقة': s.area,
+                    'حالة الإرسال': statusArabic[s.status] || 'لم يُرسل'
+                }));
+
+                const ws = XLSX.utils.json_to_sheet(exportData);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'تقرير الإرسال');
+                const baseName = (state.fileName || 'الطلاب').replace(/\.[^/.]+$/, '');
+                XLSX.writeFile(wb, `تقرير_تيليجرام_${baseName}.xlsx`);
+                showToast('تم تحميل تقرير الإكسيل بنجاح!', 'success');
+            }
+
+            // --- Column Mapping Modal ---
+            function openMappingModal() {
+                const populateSelect = (selectEl, selectedVal, allowEmpty) => {
+                    selectEl.innerHTML = '';
+                    if (allowEmpty) {
+                        const opt = document.createElement('option');
+                        opt.value = '';
+                        opt.textContent = '-- بدون --';
+                        selectEl.appendChild(opt);
+                    }
+                    state.headers.forEach(h => {
+                        const opt = document.createElement('option');
+                        opt.value = h;
+                        opt.textContent = h;
+                        if (h === selectedVal) opt.selected = true;
+                        selectEl.appendChild(opt);
+                    });
+                };
+
+                populateSelect(el.mapName, state.mapping.name, false);
+                populateSelect(el.mapPhone, state.mapping.phone, false);
+                populateSelect(el.mapCode, state.mapping.code, true);
+                populateSelect(el.mapGrade, state.mapping.grade, true);
+                populateSelect(el.mapGov, state.mapping.gov, true);
+                populateSelect(el.mapArea, state.mapping.area, true);
+
+                el.mappingModal.classList.remove('hidden');
+                el.mappingModal.classList.add('flex');
+            }
+
+            function closeMappingModal() {
+                el.mappingModal.classList.add('hidden');
+                el.mappingModal.classList.remove('flex');
+            }
+
+            // --- Render Stats ---
+            function renderStats() {
+                const total = state.students.length;
+                const sent = state.students.filter(s => s.status === 'sent').length;
+                const skipped = state.students.filter(s => s.status === 'skipped').length;
+                const remaining = total - sent - skipped;
+                const done = sent + skipped;
+                const percent = total > 0 ? Math.round((done / total) * 100) : 0;
+
+                el.statTotal.textContent = total;
+                el.statSent.textContent = sent;
+                el.statSkipped.textContent = skipped;
+                el.statRemaining.textContent = remaining;
+                el.statPercent.textContent = `${percent}%`;
+                el.statProgressBar.style.width = `${percent}%`;
+            }
+
+            // --- Render Telegram Mode Toggle UI ---
+            function renderTgMode() {
+                el.tgModeBtns.forEach(btn => {
+                    const mode = btn.getAttribute('data-mode');
+                    if (mode === state.tgMode) {
+                        btn.className = 'tg-mode-btn px-3 py-1.5 rounded-lg text-xs font-extrabold transition bg-sky-500 text-slate-950 shadow-sm';
+                    } else {
+                        btn.className = 'tg-mode-btn px-3 py-1.5 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white';
+                    }
+                });
+            }
+
+            // --- Render Focus Card ---
+            function renderFocusCard() {
+                const total = state.students.length;
+                if (total === 0) return;
+
+                if (state.currentIndex < 0) state.currentIndex = 0;
+                if (state.currentIndex >= total) state.currentIndex = total - 1;
+
+                const student = state.students[state.currentIndex];
+
+                el.focusPosition.textContent = `طالب ${state.currentIndex + 1} من ${total}`;
+                el.focusName.textContent = student.name;
+                el.focusPhone.textContent = student.phone ? `+${student.phone}` : (student.rawPhone || 'لا يوجد رقم');
+
+                el.focusPhoneWarning.classList.toggle('hidden', student.validPhone);
+
+                // Status Badge
+                const statusMap = {
+                    pending: { text: 'لم يُرسل', cls: 'bg-slate-800/90 text-slate-300 border-white/10' },
+                    sent: { text: 'تم الإرسال ✅', cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
+                    skipped: { text: 'متخطى / خصوصية ⚠️', cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30' }
+                };
+                const st = statusMap[student.status] || statusMap.pending;
+                el.focusStatusBadge.textContent = st.text;
+                el.focusStatusBadge.className = `px-3 py-1 rounded-full text-xs font-bold border ${st.cls}`;
+
+                // Metadata Pills
+                const pills = [];
+                if (student.code) pills.push(`<span class="px-2.5 py-1 rounded-lg bg-slate-800/90 text-slate-300 border border-white/10"><i class="fa-solid fa-id-badge text-sky-400 ml-1"></i>الكود: <b class="text-white">${student.code}</b></span>`);
+                if (student.grade) pills.push(`<span class="px-2.5 py-1 rounded-lg bg-slate-800/90 text-slate-300 border border-white/10"><i class="fa-solid fa-graduation-cap text-emerald-400 ml-1"></i>الصف: <b class="text-white">${student.grade}</b></span>`);
+                if (student.gov) pills.push(`<span class="px-2.5 py-1 rounded-lg bg-slate-800/90 text-slate-300 border border-white/10"><i class="fa-solid fa-map text-sky-400 ml-1"></i>المحافظة: <b class="text-white">${student.gov}</b></span>`);
+                if (student.area) pills.push(`<span class="px-2.5 py-1 rounded-lg bg-slate-800/90 text-slate-300 border border-white/10"><i class="fa-solid fa-location-dot text-emerald-400 ml-1"></i>المنطقة: <b class="text-white">${student.area}</b></span>`);
+
+                el.focusMetaPills.innerHTML = pills.join('');
+                el.focusMetaPills.classList.toggle('hidden', pills.length === 0);
+
+                // Live Preview
+                el.focusMessagePreview.textContent = buildMessage(student);
+            }
+
+            // --- Render Student List Sidebar ---
+            function renderStudentList() {
+                const q = state.searchQuery.trim().toLowerCase();
+                const filtered = state.students
+                    .map((s, originalIndex) => ({ ...s, originalIndex }))
+                    .filter(s => {
+                        if (state.filter === 'pending' && s.status !== 'pending') return false;
+                        if (state.filter === 'sent' && s.status !== 'sent') return false;
+                        if (state.filter === 'skipped' && s.status !== 'skipped') return false;
+                        if (q) {
+                            return (
+                                s.name.toLowerCase().includes(q) ||
+                                s.phone.includes(q) ||
+                                s.rawPhone.includes(q) ||
+                                s.code.toLowerCase().includes(q)
+                            );
+                        }
+                        return true;
+                    });
+
+                el.listCountBadge.textContent = `${filtered.length} طالب`;
+
+                if (filtered.length === 0) {
+                    el.studentListContainer.innerHTML = `
+                        <div class="text-center py-10 text-slate-500 text-xs font-semibold">
+                            مفيش طلاب مطابقين للبحث أو الفلتر ده
+                        </div>
+                    `;
+                    return;
+                }
+
+                const maxRender = 300;
+                const slice = filtered.slice(0, maxRender);
+
+                el.studentListContainer.innerHTML = slice.map(s => {
+                    const isActive = s.originalIndex === state.currentIndex;
+                    const activeCls = isActive
+                        ? 'bg-sky-500/15 border-sky-500/50 ring-1 ring-sky-400/40'
+                        : 'bg-slate-900/55 border-white/5 hover:bg-slate-800/75';
+
+                    const dotCls = s.status === 'sent'
+                        ? 'bg-emerald-400'
+                        : (s.status === 'skipped' ? 'bg-amber-400' : 'bg-slate-500');
+
+                    return `
+                        <button data-index="${s.originalIndex}" class="student-item w-full text-right p-3 rounded-2xl border transition flex items-center justify-between gap-2 ${activeCls}">
+                            <div class="min-w-0">
+                                <p class="text-xs sm:text-sm font-bold text-white truncate">${s.originalIndex + 1}. ${s.name}</p>
+                                <p class="text-[11px] font-mono text-slate-400 mt-0.5 truncate" dir="ltr">${s.phone ? '+' + s.phone : 'رقم غير صالح'}</p>
+                            </div>
+                            <span class="w-2.5 h-2.5 rounded-full shrink-0 ${dotCls}"></span>
+                        </button>
+                    `;
+                }).join('') + (filtered.length > maxRender ? `<p class="text-center text-[11px] text-slate-500 py-2">استخدم البحث للوصول لباقي الـ ${filtered.length} طالب</p>` : '');
+            }
+
+            // --- Render All ---
+            function renderAll() {
+                const hasData = state.students.length > 0;
+                el.uploadSection.classList.toggle('hidden', hasData);
+                el.dashboardSection.classList.toggle('hidden', !hasData);
+                el.btnResetData.classList.toggle('hidden', !hasData);
+                el.btnExportExcel.classList.toggle('hidden', !hasData);
+                el.btnOpenMapping.classList.toggle('hidden', !hasData || state.rawRows.length === 0);
+
+                if (hasData) {
+                    el.fileBadge.textContent = state.fileName || 'شيت الطلاب';
+                    el.fileBadge.classList.remove('hidden');
+                    el.tgLinkInput.value = state.tgLink;
+                    el.messageTemplate.value = state.template;
+                    el.toggleSkipSent.checked = state.skipSent;
+                    renderTgMode();
+                    renderStats();
+                    renderFocusCard();
+                    renderStudentList();
+                } else {
+                    el.fileBadge.classList.add('hidden');
+                }
+            }
+
+            // --- Core Action: Open Telegram for Current Student ---
+            function openTelegramForCurrent() {
+                const student = state.students[state.currentIndex];
+                if (!student) return;
+
+                if (!student.validPhone) {
+                    showToast('رقم الطالب ده غير صالح أو ناقص!', 'error');
+                    return;
+                }
+
+                const msg = buildMessage(student);
+                const url = buildTelegramUrl(student.phone, msg);
+
+                if (state.tgMode === 'app') {
+                    // Direct protocol open (avoids leaving blank browser tabs)
+                    window.location.href = url;
+                } else {
+                    window.open(url, '_blank');
+                }
+
+                student.status = 'sent';
+                saveState();
+                renderStats();
+                renderFocusCard();
+                renderStudentList();
+            }
+
+            // --- Navigation Helpers ---
+            function findNextIndex(fromIdx) {
+                const total = state.students.length;
+                if (total === 0) return -1;
+
+                if (!state.skipSent) {
+                    return fromIdx + 1 < total ? fromIdx + 1 : -1;
+                }
+
+                for (let i = fromIdx + 1; i < total; i++) {
+                    if (state.students[i].status === 'pending') return i;
+                }
+                for (let i = 0; i < fromIdx; i++) {
+                    if (state.students[i].status === 'pending') return i;
+                }
+                return -1;
+            }
+
+            function goNext(andOpenChat = false) {
+                const nextIdx = findNextIndex(state.currentIndex);
+                if (nextIdx === -1) {
+                    showToast('عاش! خلصت كل الطلاب المتبقيين في القائمة 🎉', 'success');
+                    return;
+                }
+                state.currentIndex = nextIdx;
+                saveState();
+                renderFocusCard();
+                renderStudentList();
+
+                if (andOpenChat) {
+                    openTelegramForCurrent();
+                }
+            }
+
+            function goPrev() {
+                if (state.currentIndex > 0) {
+                    state.currentIndex--;
+                    saveState();
+                    renderFocusCard();
+                    renderStudentList();
+                }
+            }
+
+            function skipCurrent() {
+                const student = state.students[state.currentIndex];
+                if (!student) return;
+                student.status = 'skipped';
+                saveState();
+                renderStats();
+                showToast(`تم تخطي ${student.name}`, 'warning');
+                goNext(false);
+            }
+
+            // --- Event Listeners: Upload & Drag/Drop ---
+            el.fileInput.addEventListener('change', (e) => {
+                if (e.target.files && e.target.files[0]) {
+                    handleFile(e.target.files[0]);
+                }
+            });
+
+            el.dropzone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                el.dropzone.classList.add('border-sky-400', 'bg-sky-500/10');
+            });
+            el.dropzone.addEventListener('dragleave', () => {
+                el.dropzone.classList.remove('border-sky-400', 'bg-sky-500/10');
+            });
+            el.dropzone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                el.dropzone.classList.remove('border-sky-400', 'bg-sky-500/10');
+                if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    handleFile(e.dataTransfer.files[0]);
+                }
+            });
+
+            // --- Sample Data (5 Realistic Egyptian Students matching اسيوط.xlsx) ---
+            el.btnLoadSample.addEventListener('click', () => {
+                const sampleRows = [
+                    { 'الاسم': 'أحمد محمود عبد الرحمن', 'الهاتف': '1108018996', 'كود الطالب': 'AS-1001', 'الصف': 'الثالث الثانوي', 'المحافظة': 'أسيوط', 'المنطقة': 'أسيوط الجديدة', 'هاتف ولي الأمر': '01012345678' },
+                    { 'الاسم': 'مريم خالد سيد', 'الهاتف': '01090747536', 'كود الطالب': 'AS-1002', 'الصف': 'الثالث الثانوي', 'المحافظة': 'أسيوط', 'المنطقة': 'ديروط', 'هاتف ولي الأمر': '01122334455' },
+                    { 'الاسم': 'يوسف إبراهيم حسن', 'الهاتف': '201223456789', 'كود الطالب': 'AS-1003', 'الصف': 'الثالث الثانوي', 'المحافظة': 'أسيوط', 'المنطقة': 'منفلوط', 'هاتف ولي الأمر': '01299887766' },
+                    { 'الاسم': 'سلمى طارق محمد', 'الهاتف': '٠١٥٥٦٧٨٩٠١٢', 'كود الطالب': 'AS-1004', 'الصف': 'الثاني الثانوي', 'المحافظة': 'أسيوط', 'المنطقة': 'أبنوب', 'هاتف ولي الأمر': '01055443322' },
+                    { 'الاسم': 'عمر أشرف فاروق', 'الهاتف': '011 4567-8910', 'كود الطالب': 'AS-1005', 'الصف': 'الثالث الثانوي', 'المحافظة': 'أسيوط', 'المنطقة': 'القوصية', 'هاتف ولي الأمر': '01188776655' }
+                ];
+                state.fileName = 'اسيوط_تجريبي.xlsx';
+                state.rawRows = sampleRows;
+                state.headers = Object.keys(sampleRows[0]);
+                state.mapping = autoDetectMapping(state.headers);
+                state.students = buildStudentsFromRows(sampleRows, state.mapping);
+                state.currentIndex = 0;
+                saveState();
+                renderAll();
+                showToast('تم تحميل 5 طلاب تجريبيين بنجاح!', 'success');
+            });
+
+            // --- Event Listeners: Action Buttons ---
+            el.btnSendTg.addEventListener('click', openTelegramForCurrent);
+            el.btnNextAndOpen.addEventListener('click', () => goNext(true));
+            el.btnNextOnly.addEventListener('click', () => goNext(false));
+            el.btnPrev.addEventListener('click', goPrev);
+            el.btnSkip.addEventListener('click', skipCurrent);
+            el.btnExportExcel.addEventListener('click', exportReport);
+
+            el.btnCopyMsg.addEventListener('click', () => {
+                copyText(el.focusMessagePreview.textContent, 'تم نسخ الرسالة!');
+            });
+
+            el.btnCopyPhone.addEventListener('click', () => {
+                const student = state.students[state.currentIndex];
+                if (!student) return;
+                copyText(student.phone ? `+${student.phone}` : student.rawPhone, 'تم نسخ رقم الهاتف!');
+            });
+
+            // --- Telegram Opening Mode Toggle ---
+            el.tgModeBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    state.tgMode = btn.getAttribute('data-mode');
+                    saveState();
+                    renderTgMode();
+                    showToast(
+                        state.tgMode === 'app'
+                            ? 'تم التبديل لوضع الفتح المباشر في تطبيق تيليجرام ⚡'
+                            : 'تم التبديل لوضع رابط المتصفح العام 🌐',
+                        'info'
+                    );
+                });
+            });
+
+            // --- Template, Link & Variable Chips ---
+            el.tgLinkInput.addEventListener('input', (e) => {
+                state.tgLink = e.target.value;
+                saveState();
+                renderFocusCard();
+            });
+
+            el.messageTemplate.addEventListener('input', (e) => {
+                state.template = e.target.value;
+                saveState();
+                renderFocusCard();
+            });
+
+            el.toggleSkipSent.addEventListener('change', (e) => {
+                state.skipSent = e.target.checked;
+                saveState();
+            });
+
+            el.insertVarBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const variable = btn.getAttribute('data-insert');
+                    const ta = el.messageTemplate;
+                    const start = ta.selectionStart;
+                    const end = ta.selectionEnd;
+                    ta.value = ta.value.substring(0, start) + variable + ta.value.substring(end);
+                    ta.focus();
+                    ta.selectionStart = ta.selectionEnd = start + variable.length;
+                    state.template = ta.value;
+                    saveState();
+                    renderFocusCard();
+                });
+            });
+
+            // --- Search & Filter ---
+            el.searchInput.addEventListener('input', (e) => {
+                state.searchQuery = e.target.value;
+                renderStudentList();
+            });
+
+            el.filterTabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    state.filter = tab.getAttribute('data-filter');
+                    el.filterTabs.forEach(t => {
+                        t.className = 'filter-tab py-1.5 rounded-lg text-[11px] font-bold transition text-slate-400 hover:text-white';
+                    });
+                    tab.className = 'filter-tab py-1.5 rounded-lg text-[11px] font-bold transition bg-sky-500 text-slate-950';
+                    renderStudentList();
+                });
+            });
+
+            // --- Click Student in Sidebar ---
+            el.studentListContainer.addEventListener('click', (e) => {
+                const btn = e.target.closest('.student-item');
+                if (!btn) return;
+                const idx = parseInt(btn.getAttribute('data-index'), 10);
+                if (!isNaN(idx)) {
+                    state.currentIndex = idx;
+                    saveState();
+                    renderFocusCard();
+                    renderStudentList();
+                }
+            });
+
+            // --- Keyboard Shortcuts (when not typing in inputs) ---
+            document.addEventListener('keydown', (e) => {
+                if (state.students.length === 0) return;
+                const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
+                if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+                if (!el.mappingModal.classList.contains('hidden') || !el.resetModal.classList.contains('hidden')) return;
+
+                const key = e.key.toLowerCase();
+                if (e.key === 'Enter' || key === 'n' || key === 'ى') {
+                    e.preventDefault();
+                    goNext(true);
+                } else if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    goPrev();
+                } else if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    goNext(false);
+                } else if (key === 's' || key === 'س') {
+                    e.preventDefault();
+                    skipCurrent();
+                }
+            });
+
+            // --- Mapping Modal Events ---
+            el.btnOpenMapping.addEventListener('click', openMappingModal);
+            el.btnCancelMapping.addEventListener('click', closeMappingModal);
+            el.btnSaveMapping.addEventListener('click', () => {
+                state.mapping = {
+                    name: el.mapName.value,
+                    phone: el.mapPhone.value,
+                    code: el.mapCode.value,
+                    grade: el.mapGrade.value,
+                    gov: el.mapGov.value,
+                    area: el.mapArea.value
+                };
+                state.students = buildStudentsFromRows(state.rawRows, state.mapping);
+                state.currentIndex = 0;
+                saveState();
+                closeMappingModal();
+                renderAll();
+                showToast('تم تحديث الأعمدة بنجاح!', 'success');
+            });
+
+            // --- Reset Modal Events ---
+            el.btnResetData.addEventListener('click', () => {
+                el.resetModal.classList.remove('hidden');
+                el.resetModal.classList.add('flex');
+            });
+            el.btnCancelReset.addEventListener('click', () => {
+                el.resetModal.classList.add('hidden');
+                el.resetModal.classList.remove('flex');
+            });
+            el.btnConfirmReset.addEventListener('click', () => {
+                localStorage.removeItem(STORAGE_KEY);
+                state.students = [];
+                state.rawRows = [];
+                state.fileName = '';
+                state.currentIndex = 0;
+                el.fileInput.value = '';
+                el.resetModal.classList.add('hidden');
+                el.resetModal.classList.remove('flex');
+                renderAll();
+                showToast('تم تصفير البيانات، تقدر ترفع ملف جديد دلوقتي', 'info');
+            });
+
+            // --- Initialize ---
+            loadState();
+            renderAll();
+        })();
+    </script>
+</body>
+</html>
